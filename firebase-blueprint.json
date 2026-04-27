@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile document",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["teacher"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role", "createdAt"]
+    },
+    "Meeting": {
+      "title": "Meeting",
+      "description": "A live class session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subject": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "meetingCode": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "ended"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "subject", "teacherId", "meetingCode", "status", "createdAt"]
+    },
+    "JoinRequest": {
+      "title": "Join Request",
+      "description": "Student request to join a meeting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "meetingId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "meetingId", "studentName", "status", "createdAt"]
+    },
+    "Participant": {
+      "title": "Participant",
+      "description": "Approved student in a meeting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "meetingId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "joinedAt": { "type": "string" }
+      },
+      "required": ["id", "meetingId", "studentName", "joinedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Collection of teachers"
+    },
+    "/meetings/{meetingId}": {
+      "schema": { "$ref": "#/entities/Meeting" },
+      "description": "Collection of meetings"
+    },
+    "/joinRequests/{requestId}": {
+      "schema": { "$ref": "#/entities/JoinRequest" },
+      "description": "Join requests for meetings"
+    },
+    "/participants/{participantId}": {
+      "schema": { "$ref": "#/entities/Participant" },
+      "description": "Approved participants"
+    }
+  }
+}

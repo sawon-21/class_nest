@@ -1,0 +1,6 @@
+{
+  "name": "ClassNest",
+  "description": "Smart online class platform for live video, automated attendance, homework, and student management.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": []
+}

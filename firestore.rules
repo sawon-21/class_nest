@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() { return request.auth != null; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // User/Teacher
+    match /users/{userId} {
+      allow get: if true;
+      allow create: if isSignedIn() && request.auth.uid == userId && 
+                       incoming().keys().hasAll(['uid', 'name', 'email', 'role', 'createdAt']) &&
+                       incoming().role == 'teacher' &&
+                       incoming().uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Meetings
+    match /meetings/{meetingId} {
+      allow read: if true; // Guests need to read to verify meeting code
+      allow create: if isSignedIn() && 
+                       isValidId(meetingId) &&
+                       incoming().keys().hasAll(['id', 'title', 'subject', 'teacherId', 'meetingCode', 'status', 'createdAt']) &&
+                       incoming().teacherId == request.auth.uid &&
+                       incoming().status == 'active';
+      allow update: if isSignedIn() && existing().teacherId == request.auth.uid;
+    }
+
+    // JoinRequests
+    match /joinRequests/{reqId} {
+      allow get: if true; // Anyone can read their own request
+      allow list: if isSignedIn(); // Teachers list requests
+      allow create: if isValidId(reqId) && 
+                       incoming().keys().hasAll(['id', 'meetingId', 'studentName', 'status', 'createdAt']) &&
+                       incoming().status == 'pending';
+      allow update: if isSignedIn() && // Only teacher can update status
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+    }
+
+    // Participants
+    match /participants/{partId} {
+      allow read: if true; 
+      allow create, update: if isSignedIn(); 
+    }
+  }
+}
+
