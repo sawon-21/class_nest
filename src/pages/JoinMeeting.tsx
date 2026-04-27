@@ -51,9 +51,10 @@ export default function JoinMeeting() {
         const data = docSnap.data();
         setRequestStatus(data.status);
         if (data.status === 'accepted') {
-          // Join the room directly since accepted
-          // We can pass the participant name via state or URL
           sessionStorage.setItem('studentName', data.studentName);
+          if (data.participantId) {
+             sessionStorage.setItem('participantId', data.participantId);
+          }
           navigate(`/class/${meetingCode}`);
         }
       }

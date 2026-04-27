@@ -3,8 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthStore } from '../store/useAuthStore';
-import { JitsiMeeting } from '@jitsi/react-sdk';
 import { Users, Check, X, ShieldAlert, DoorOpen } from 'lucide-react';
+import WebRTCRoom from '../components/WebRTCRoom';
 
 export default function LiveRoom() {
   const { meetingCode } = useParams<{ meetingCode: string }>();
@@ -72,9 +72,7 @@ export default function LiveRoom() {
 
   const handleRequest = async (requestId: string, status: 'accepted' | 'rejected', studentName?: string) => {
     try {
-      await updateDoc(doc(db, 'joinRequests', requestId), { status });
       if (status === 'accepted' && studentName) {
-        // optionally add to participants list
         const partId = doc(collection(db, 'participants')).id;
         await setDoc(doc(db, 'participants', partId), {
           id: partId,
@@ -82,6 +80,9 @@ export default function LiveRoom() {
           studentName,
           joinedAt: new Date().toISOString()
         });
+        await updateDoc(doc(db, 'joinRequests', requestId), { status, participantId: partId });
+      } else {
+        await updateDoc(doc(db, 'joinRequests', requestId), { status });
       }
     } catch (e) {
       console.error(e);
@@ -96,15 +97,15 @@ export default function LiveRoom() {
     return <div className="h-full flex items-center justify-center text-red-400">Meeting invalid or ended.</div>;
   }
 
-  // The room name needs to be globally unique for Jitsi.
   const jitsiRoomName = `ClassNest-Secure-${meeting.id}`;
   const isTeacher = user && user.uid === meeting.teacherId;
+  const localId = isTeacher ? user.uid : sessionStorage.getItem('participantId') || `guest-${Date.now()}`;
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden relative bg-black">
       {/* Top Bar inside the meeting context */}
       <div className="absolute top-4 left-4 z-10 flex items-center gap-4 bg-slate-900/80 backdrop-blur tracking-tight border border-slate-700/50 px-4 py-2 rounded-full shadow-2xl">
-        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
         <span className="font-bold text-slate-200">{meeting.title}</span>
         {isTeacher && (
            <span className="bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded text-xs font-bold font-mono">HOST</span>
@@ -172,37 +173,8 @@ export default function LiveRoom() {
         </div>
       )}
 
-      {/* Jitsi Meet Iframe */}
-      <div className="flex-1 w-full bg-slate-950">
-        <JitsiMeeting
-          domain="meet.jit.si"
-          roomName={jitsiRoomName}
-          configOverwrite={{
-            startWithAudioMuted: true,
-            disableModeratorIndicator: true,
-            startScreenSharing: true,
-            enableEmailInStats: false,
-            prejoinPageEnabled: false, // We handle pre-join approval
-            disableDeepLinking: true,
-          }}
-          interfaceConfigOverwrite={{
-            DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
-            SHOW_CHROME_EXTENSION_BANNER: false,
-          }}
-          userInfo={{
-            displayName: isTeacher ? (user.displayName || 'Teacher') : guestName,
-            email: user?.email || '',
-          }}
-          onApiReady={(externalApi) => {
-            // Wait for API if needed
-          }}
-          getIFrameRef={(iframeRef) => {
-            iframeRef.style.height = '100%';
-            iframeRef.style.width = '100%';
-            iframeRef.style.border = 'none';
-          }}
-        />
-      </div>
+      {/* WebRTC Video Stage */}
+      <WebRTCRoom meetingId={meeting.id} isTeacher={isTeacher || false} localId={localId} guestName={guestName} />
     </div>
   );
 }
