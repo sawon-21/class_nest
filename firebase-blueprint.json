@@ -21,12 +21,18 @@
         "id": { "type": "string" },
         "title": { "type": "string" },
         "subject": { "type": "string" },
+        "batchName": { "type": "string" },
         "teacherId": { "type": "string" },
+        "teacherName": { "type": "string" },
         "meetingCode": { "type": "string" },
+        "meetingLink": { "type": "string" },
+        "jitsiRoomName": { "type": "string" },
         "status": { "type": "string", "enum": ["active", "ended"] },
-        "createdAt": { "type": "string" }
+        "isWhiteboardActive": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "endedAt": { "type": "string" }
       },
-      "required": ["id", "title", "subject", "teacherId", "meetingCode", "status", "createdAt"]
+      "required": ["id", "title", "teacherId", "meetingCode", "jitsiRoomName", "status", "createdAt"]
     },
     "JoinRequest": {
       "title": "Join Request",
@@ -35,11 +41,15 @@
       "properties": {
         "id": { "type": "string" },
         "meetingId": { "type": "string" },
+        "meetingCode": { "type": "string" },
         "studentName": { "type": "string" },
+        "studentContact": { "type": "string" },
         "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
-        "createdAt": { "type": "string" }
+        "participantId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
       },
-      "required": ["id", "meetingId", "studentName", "status", "createdAt"]
+      "required": ["id", "meetingId", "meetingCode", "studentName", "status", "createdAt"]
     },
     "Participant": {
       "title": "Participant",
@@ -48,10 +58,28 @@
       "properties": {
         "id": { "type": "string" },
         "meetingId": { "type": "string" },
+        "meetingCode": { "type": "string" },
         "studentName": { "type": "string" },
-        "joinedAt": { "type": "string" }
+        "studentContact": { "type": "string" },
+        "requestId": { "type": "string" },
+        "joinedAt": { "type": "string" },
+        "leftAt": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "approvedByTeacher": { "type": "boolean" }
       },
-      "required": ["id", "meetingId", "studentName", "joinedAt"]
+      "required": ["id", "meetingId", "studentName", "joinedAt", "isActive", "approvedByTeacher"]
+    },
+    "Whiteboard": {
+      "title": "Whiteboard",
+      "description": "Whiteboard data for a meeting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "meetingId": { "type": "string" },
+        "lines": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "meetingId"]
     }
   },
   "firestore": {
@@ -70,6 +98,10 @@
     "/participants/{participantId}": {
       "schema": { "$ref": "#/entities/Participant" },
       "description": "Approved participants"
+    },
+    "/whiteboards/{whiteboardId}": {
+      "schema": { "$ref": "#/entities/Whiteboard" },
+      "description": "Whiteboard data per meeting"
     }
   }
 }

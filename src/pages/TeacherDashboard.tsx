@@ -59,6 +59,7 @@ export default function TeacherDashboard() {
         subject: subject || 'General',
         teacherId: user.uid,
         meetingCode,
+        jitsiRoomName: `ClassNest-${meetingId}`,
         status: 'active',
         createdAt: new Date().toISOString()
       });

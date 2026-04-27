@@ -25,23 +25,20 @@ service cloud.firestore {
 
     // Meetings
     match /meetings/{meetingId} {
-      allow read: if true; // Guests need to read to verify meeting code
+      allow read: if true; 
       allow create: if isSignedIn() && 
                        isValidId(meetingId) &&
-                       incoming().keys().hasAll(['id', 'title', 'subject', 'teacherId', 'meetingCode', 'status', 'createdAt']) &&
-                       incoming().teacherId == request.auth.uid &&
-                       incoming().status == 'active';
+                       incoming().keys().hasAll(['id', 'title', 'teacherId', 'meetingCode', 'jitsiRoomName', 'status', 'createdAt']) &&
+                       incoming().teacherId == request.auth.uid;
       allow update: if isSignedIn() && existing().teacherId == request.auth.uid;
     }
 
     // JoinRequests
     match /joinRequests/{reqId} {
-      allow get: if true; // Anyone can read their own request
-      allow list: if isSignedIn(); // Teachers list requests
-      allow create: if isValidId(reqId) && 
-                       incoming().keys().hasAll(['id', 'meetingId', 'studentName', 'status', 'createdAt']) &&
-                       incoming().status == 'pending';
-      allow update: if true; // Allow teacher and student updates for simplicity in MVP
+      allow get: if true; 
+      allow list: if true; 
+      allow create: if isValidId(reqId);
+      allow update: if true; // Teacher and student logic simplified
     }
 
     // Participants
@@ -49,13 +46,11 @@ service cloud.firestore {
       allow read, write: if true; 
     }
 
-    // WebRTC Signaling
-    match /signals/{signalId} {
+    // Whiteboards
+    match /whiteboards/{wbId} {
       allow read, write: if true; 
     }
-    match /signals/{signalId}/{colId}/{docId} {
-      allow read, write: if true;
-    }
+
   }
 }
 

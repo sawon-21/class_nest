@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuthStore } from '../store/useAuthStore';
-import { Users, Check, X, ShieldAlert, DoorOpen } from 'lucide-react';
-import WebRTCRoom from '../components/WebRTCRoom';
+import { Users, Check, X, DoorOpen, PenTool } from 'lucide-react';
+import { JitsiMeeting } from '@jitsi/react-sdk';
+import Whiteboard from '../components/Whiteboard';
 
 export default function LiveRoom() {
   const { meetingCode } = useParams<{ meetingCode: string }>();
@@ -38,6 +39,14 @@ export default function LiveRoom() {
         const mDoc = snapshot.docs[0];
         setMeeting({ id: mDoc.id, ...mDoc.data() });
         setLoading(false);
+
+        // Also listed to real-time meeting updates for whiteboard status
+        onSnapshot(doc(db, 'meetings', mDoc.id), (docSnap) => {
+           if(docSnap.exists()) {
+              setMeeting({ id: docSnap.id, ...docSnap.data() });
+           }
+        });
+
       } catch (err) {
         console.error(err);
         setLoading(false);
@@ -89,6 +98,17 @@ export default function LiveRoom() {
     }
   };
 
+  const toggleWhiteboard = async () => {
+    if (!meeting || !user || meeting.teacherId !== user.uid) return;
+    try {
+      await updateDoc(doc(db, 'meetings', meeting.id), {
+        isWhiteboardActive: !meeting.isWhiteboardActive
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   if (loading) {
      return <div className="h-full flex items-center justify-center text-slate-400">Loading meeting environment...</div>;
   }
@@ -97,14 +117,14 @@ export default function LiveRoom() {
     return <div className="h-full flex items-center justify-center text-red-400">Meeting invalid or ended.</div>;
   }
 
-  const jitsiRoomName = `ClassNest-Secure-${meeting.id}`;
+  const jitsiRoomName = meeting.jitsiRoomName || `ClassNest-Secure-${meeting.id}`;
   const isTeacher = user && user.uid === meeting.teacherId;
-  const localId = isTeacher ? user.uid : sessionStorage.getItem('participantId') || `guest-${Date.now()}`;
+  const isWhiteboardActive = meeting.isWhiteboardActive === true;
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden relative bg-black">
       {/* Top Bar inside the meeting context */}
-      <div className="absolute top-4 left-4 z-10 flex items-center gap-4 bg-slate-900/80 backdrop-blur tracking-tight border border-slate-700/50 px-4 py-2 rounded-full shadow-2xl">
+      <div className="absolute top-4 left-4 z-30 flex items-center gap-4 bg-slate-900/80 backdrop-blur tracking-tight border border-slate-700/50 px-4 py-2 rounded-full shadow-2xl">
         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
         <span className="font-bold text-slate-200">{meeting.title}</span>
         {isTeacher && (
@@ -113,7 +133,15 @@ export default function LiveRoom() {
       </div>
 
       {isTeacher && (
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+          <button 
+            onClick={toggleWhiteboard}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-2xl backdrop-blur font-bold transition-all ${isWhiteboardActive ? 'bg-emerald-600 text-white' : 'bg-slate-900/80 border border-slate-700 text-slate-300 hover:bg-slate-800'}`}
+          >
+            <PenTool className="w-4 h-4" />
+            Whiteboard
+          </button>
+
           <button 
             onClick={() => setShowRequests(!showRequests)}
             className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-2xl backdrop-blur font-bold transition-all ${requests.length > 0 ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-slate-900/80 border border-slate-700 text-slate-300 hover:bg-slate-800'}`}
@@ -131,7 +159,7 @@ export default function LiveRoom() {
 
       {/* Teacher Request Sidebar overlay */}
       {isTeacher && showRequests && (
-        <div className="absolute top-16 right-4 z-20 w-80 max-h-[80vh] flex flex-col bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="absolute top-16 right-4 z-40 w-80 max-h-[80vh] flex flex-col bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
           <div className="p-4 border-b border-slate-800 flex items-center justify-between">
             <h3 className="font-bold text-slate-100 flex items-center gap-2">
               <Users className="w-4 h-4" />
@@ -173,8 +201,78 @@ export default function LiveRoom() {
         </div>
       )}
 
-      {/* WebRTC Video Stage */}
-      <WebRTCRoom meetingId={meeting.id} isTeacher={isTeacher || false} localId={localId} guestName={guestName} />
+      {/* Main Content Area */}
+      <div className="flex-1 w-full h-full relative">
+        {isWhiteboardActive ? (
+          <>
+            {/* Whiteboard takes full screen */}
+            <div className="absolute inset-0 z-10 p-20 pt-24 bg-slate-100">
+               <div className="w-full h-full rounded-2xl overflow-hidden shadow-2xl relative border border-slate-300">
+                 <Whiteboard meetingId={meeting.id} isTeacher={isTeacher} />
+               </div>
+            </div>
+            
+            {/* Jitsi shrinks to a PIP / Sidebar view */}
+            <div className="absolute bottom-4 right-4 z-20 w-80 h-48 bg-black rounded-2xl shadow-2xl border-2 border-slate-700 overflow-hidden resize disabled:resize-none">
+              <JitsiMeeting
+                domain="meet.jit.si"
+                roomName={jitsiRoomName}
+                configOverwrite={{
+                  startWithAudioMuted: true,
+                  disableModeratorIndicator: true,
+                  prejoinPageEnabled: false,
+                  disableDeepLinking: true,
+                  p2p: { enabled: false }
+                }}
+                interfaceConfigOverwrite={{
+                  DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+                  SHOW_CHROME_EXTENSION_BANNER: false,
+                  TOOLBAR_BUTTONS: ['microphone', 'camera']
+                }}
+                userInfo={{
+                  displayName: isTeacher ? (user.displayName || 'Teacher') : guestName,
+                  email: user?.email || '',
+                }}
+                getIFrameRef={(iframeRef) => {
+                  iframeRef.style.height = '100%';
+                  iframeRef.style.width = '100%';
+                  iframeRef.style.border = 'none';
+                }}
+              />
+            </div>
+          </>
+        ) : (
+          /* Jitsi takes full screen */
+          <div className="absolute inset-0 z-10 bg-slate-950">
+            <JitsiMeeting
+              domain="meet.jit.si"
+              roomName={jitsiRoomName}
+              configOverwrite={{
+                startWithAudioMuted: true,
+                disableModeratorIndicator: true,
+                startScreenSharing: true,
+                enableEmailInStats: false,
+                prejoinPageEnabled: false,
+                disableDeepLinking: true,
+                p2p: { enabled: false }
+              }}
+              interfaceConfigOverwrite={{
+                DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+                SHOW_CHROME_EXTENSION_BANNER: false,
+              }}
+              userInfo={{
+                displayName: isTeacher ? (user.displayName || 'Teacher') : guestName,
+                email: user?.email || '',
+              }}
+              getIFrameRef={(iframeRef) => {
+                iframeRef.style.height = '100%';
+                iframeRef.style.width = '100%';
+                iframeRef.style.border = 'none';
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
